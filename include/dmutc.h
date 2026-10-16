@@ -1,6 +1,7 @@
 #ifndef DMUTC_H
 #define DMUTC_H
 #include <stdint.h>
+#include <stddef.h>
 #include "dmutc_defs.h"
 #ifdef __cplusplus
 extern "C" {
@@ -44,16 +45,19 @@ typedef struct {
 dmod_dmutc_api(1.0, int, _from_calendar, (const dmutc_calendar_t* calendar, dmutc_time_t* time));
 dmod_dmutc_api(1.0, int, _to_calendar, (const dmutc_time_t* time, dmutc_calendar_t* calendar));
 
-/* Stateless VFS operations: NULL device selects /dev/rtc. The chosen RTC
- * must store UTC, never local civil time. Each call opens/closes its own
- * handle; reads use rb, writes r+b. No dmrtc or port dependency.
- * -ENODEV: opening the device failed; -ENODATA: unset/lost/stopped clock;
- * other negative driver errors propagate. Outputs are cleared on failure.
- * A successful read provides configured UTC, not authenticated time. TLS
- * users must establish their trust policy independently of these APIs. */
-dmod_dmutc_api(1.0, int, _get, (const char* device, dmutc_time_t* time));
-dmod_dmutc_api(1.0, int, _set, (const char* device, const dmutc_time_t* time));
-dmod_dmutc_api(1.0, int, _status, (const char* device, dmutc_status_t* status));
+/* The RTC source is supplied by a libsystemd library-service instance.
+ * get/set/status return -ENODEV while no source is bound. There is no default
+ * path or API-side device lookup. The chosen RTC must store UTC. Each operation
+ * owns its VFS handle; stop waits for in-flight operations before unbinding.
+ * Multiple units are ordered lexicographically by unit name; removing the
+ * selected unit selects the next active source. No flag authenticates UTC.
+ * Outputs are cleared on failure; negative driver errors propagate. */
+dmod_dmutc_api(1.0, int, _get, (dmutc_time_t* time));
+dmod_dmutc_api(1.0, int, _set, (const dmutc_time_t* time));
+dmod_dmutc_api(1.0, int, _status, (dmutc_status_t* status));
+/* Copy the selected source path for diagnostics; -ENOSPC if too small.
+ * Includes the NUL terminator; buffer is cleared on failure. */
+dmod_dmutc_api(1.0, int, _source, (char* buffer, size_t capacity));
 #ifdef __cplusplus
 }
 #endif

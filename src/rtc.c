@@ -1,12 +1,23 @@
 #include "dmod.h"
 #include "dmutc.h"
+#include "service.h"
 #include "dmdrvi_ioctl.h"
 #include <errno.h>
 #include <string.h>
 
-static const char* rtc_path(const char* device)
+static void* open_source(const char* mode, int* rc)
 {
-    return device == NULL ? "/dev/rtc" : device;
+    const char* path;
+    *rc = dmutc_lock_source(&path);
+    if (*rc != 0) return NULL;
+    void* file = Dmod_FileOpen(path, mode);
+    if (file == NULL) { *rc = -ENODEV; dmutc_unlock_source(); }
+    return file;
+}
+static void close_source(void* file)
+{
+    Dmod_FileClose(file);
+    dmutc_unlock_source();
 }
 static int read_status(void* file, dmutc_status_t* out)
 {
@@ -28,32 +39,32 @@ static int read_status(void* file, dmutc_status_t* out)
     return 0;
 }
 
-dmod_dmutc_api_declaration(1.0, int, _status, (const char* device, dmutc_status_t* out))
+dmod_dmutc_api_declaration(1.0, int, _status, (dmutc_status_t* out))
 {
     if (out == NULL) return -EINVAL;
     memset(out, 0, sizeof(*out));
-    if (*rtc_path(device) == '\0') return -EINVAL;
-    void* file = Dmod_FileOpen(rtc_path(device), "rb");
-    if (file == NULL) return -ENODEV;
-    int rc = read_status(file, out);
-    Dmod_FileClose(file);
+    int rc;
+    void* file = open_source("rb", &rc);
+    if (file == NULL) return rc;
+    rc = read_status(file, out);
+    close_source(file);
     return rc;
 }
 
-dmod_dmutc_api_declaration(1.0, int, _get, (const char* device, dmutc_time_t* out))
+dmod_dmutc_api_declaration(1.0, int, _get, (dmutc_time_t* out))
 {
     if (out == NULL) return -EINVAL;
     memset(out, 0, sizeof(*out));
-    if (*rtc_path(device) == '\0') return -EINVAL;
-    void* file = Dmod_FileOpen(rtc_path(device), "rb");
-    if (file == NULL) return -ENODEV;
+    int rc;
+    void* file = open_source("rb", &rc);
+    if (file == NULL) return rc;
     dmutc_status_t status = {0};
-    int rc = read_status(file, &status);
+    rc = read_status(file, &status);
     if (rc == 0 && ((status.flags & (DMUTC_CLOCK_RUNNING | DMUTC_CLOCK_TIME_SET)) !=
         (DMUTC_CLOCK_RUNNING | DMUTC_CLOCK_TIME_SET) || (status.flags & DMUTC_CLOCK_TIME_LOST))) rc = -ENODATA;
     dmdrvi_rtc_time_t time = {0};
     if (rc == 0) rc = Dmod_Ioctl(file, DMDRVI_IOCTL_RTC_GET_TIME, &time);
-    Dmod_FileClose(file);
+    close_source(file);
     if (rc != 0) return rc;
     if (time.year < status.min_year || time.year > status.max_year) return -EIO;
     dmutc_calendar_t c = {time.year, time.month, time.day, time.hour, time.minute,
@@ -62,14 +73,13 @@ dmod_dmutc_api_declaration(1.0, int, _get, (const char* device, dmutc_time_t* ou
     return rc == 0 ? 0 : -EIO;
 }
 
-dmod_dmutc_api_declaration(1.0, int, _set, (const char* device, const dmutc_time_t* time))
+dmod_dmutc_api_declaration(1.0, int, _set, (const dmutc_time_t* time))
 {
     dmutc_calendar_t c;
     int rc = dmutc_to_calendar(time, &c);
     if (rc != 0) return rc;
-    if (*rtc_path(device) == '\0') return -EINVAL;
-    void* file = Dmod_FileOpen(rtc_path(device), "r+b");
-    if (file == NULL) return -ENODEV;
+    void* file = open_source("r+b", &rc);
+    if (file == NULL) return rc;
     dmutc_status_t status = {0};
     rc = read_status(file, &status);
     if (rc == 0 && !(status.flags & DMUTC_CLOCK_WRITABLE)) rc = -ENOTSUP;
@@ -79,6 +89,16 @@ dmod_dmutc_api_declaration(1.0, int, _set, (const char* device, const dmutc_time
             c.second, c.weekday, 0, c.nanosecond};
         rc = Dmod_Ioctl(file, DMDRVI_IOCTL_RTC_SET_TIME, (void*)&value);
     }
+    close_source(file);
+    return rc;
+}
+
+int dmutc_probe_source(const char* path)
+{
+    void* file = Dmod_FileOpen(path, "rb");
+    if (file == NULL) return -ENODEV;
+    dmutc_status_t status = {0};
+    int rc = read_status(file, &status);
     Dmod_FileClose(file);
     return rc;
 }

@@ -51,7 +51,7 @@ set(DMOD_DMR_PATH           ${CMAKE_CURRENT_SOURCE_DIR}/dmutc.dmr)
 set(DMOD_MAL_IMPLS          )
 
 # List of DIF interfaces implemented by this module (leave empty if none)
-set(DMOD_DIF_IMPLS          )
+set(DMOD_DIF_IMPLS          libsystemd)
 
 #
 #   dmod_add_library - create a library module
@@ -63,6 +63,7 @@ dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
     # List of source files - can include C and C++ files
     src/dmutc.c
     src/rtc.c
+    src/service.c
 )
 
 target_include_directories(${DMOD_MODULE_NAME} PRIVATE
@@ -73,6 +74,6 @@ target_include_directories(${DMOD_MODULE_NAME}_if INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-dmod_link_modules(${DMOD_MODULE_NAME} dmdrvi)
+dmod_link_modules(${DMOD_MODULE_NAME} dmdrvi libsystemd dmosi)
 enable_testing()
 add_subdirectory(tests)

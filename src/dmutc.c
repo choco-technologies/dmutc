@@ -1,6 +1,8 @@
 #define DMOD_ENABLE_REGISTRATION ON
 #include "dmod.h"
 #include "dmutc.h"
+#include "libsystemd_service.h"
+#include "service.h"
 #include <errno.h>
 #include <string.h>
 
@@ -67,12 +69,31 @@ dmod_dmutc_api_declaration(1.0, int, _to_calendar,
     return 0;
 }
 
+dmod_dmutc_api_declaration(1.0, int, _source, (char* buffer, size_t capacity))
+{
+    if (buffer == NULL || capacity == 0) return -EINVAL;
+    buffer[0] = '\0';
+    const char* path;
+    int rc = dmutc_lock_source(&path);
+    if (rc != 0) return rc;
+    size_t length = strlen(path) + 1;
+    if (length > capacity) rc = -ENOSPC;
+    else memcpy(buffer, path, length);
+    dmutc_unlock_source();
+    return rc;
+}
+dmod_libsystemd_dif_api_declaration(1.0, dmutc, int, _service_start,
+    (const char* unit, int argc, const char* const argv[]))
+{
+    return dmutc_start_source(unit, argc, argv);
+}
+dmod_libsystemd_dif_api_declaration(1.0, dmutc, int, _service_stop, (const char* unit))
+{
+    return dmutc_stop_source(unit);
+}
 int dmod_init(const Dmod_Config_t* config)
 {
     (void)config;
-    return 0;
+    return dmutc_sources_init();
 }
-int dmod_deinit(void)
-{
-    return 0;
-}
+int dmod_deinit(void) { return dmutc_sources_deinit(); }

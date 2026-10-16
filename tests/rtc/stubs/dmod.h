@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include "dmutc_defs.h"
 typedef struct Dmod_Config Dmod_Config_t;
+void* Dmod_Malloc(size_t size);
+void Dmod_Free(void* p);
 void* Dmod_FileOpen(const char* path, const char* mode);
 void Dmod_FileClose(void* file);
 int Dmod_Ioctl(void* file, int command, void* arg);

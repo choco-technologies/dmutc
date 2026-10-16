@@ -5,6 +5,9 @@
 #include <limits.h>
 #include <stddef.h>
 #include <string.h>
+#ifdef DMUTC_BOARD_TEST
+#include "libsystemd.h"
+#endif
 
 _Static_assert(sizeof(dmutc_time_t) == 16, "time ABI");
 _Static_assert(offsetof(dmutc_time_t, nanosecond) == 8, "fraction ABI");
@@ -96,24 +99,59 @@ DMOD_TEST_STEP(month_boundaries_round_trip_across_the_supported_era)
     }
 }
 #ifdef DMUTC_BOARD_TEST
+struct selected_unit { char name[96]; unsigned count; };
+static bool find_utc_unit(const libsystemd_service_info_t* info, void* user)
+{
+    struct selected_unit* found=user;
+    if(strncmp(info->unit_name,"dmutc@",6)==0 && info->status.state==DMOSI_PROCESS_STATE_RUNNING) {
+        ++found->count;
+        size_t n=strlen(info->unit_name);
+        if(n<sizeof(found->name))memcpy(found->name,info->unit_name,n+1);
+    }
+    return true;
+}
+DMOD_TEST_STEP(library_service_controls_binding_without_a_path_fallback)
+{
+    struct selected_unit unit={{0},0};
+    DMOD_TEST_EXPECT_EQ(libsystemd_list(find_utc_unit,&unit),0);
+    DMOD_TEST_EXPECT_EQ(unit.count,1);
+    if(unit.count!=1 || unit.name[0]=='\0')return;
+    char source[128]; dmutc_time_t now;
+    DMOD_TEST_EXPECT_EQ(dmutc_source(source,sizeof(source)),0);
+    Dmod_Printf("UTC_SOURCE unit=%s path=%s\n",unit.name,source);
+    DMOD_TEST_EXPECT_EQ(libsystemd_stop_service(unit.name),0);
+    DMOD_TEST_EXPECT_TRUE(Dmod_IsModuleEnabled("dmutc")); /* API consumer is still connected. */
+    DMOD_TEST_EXPECT_TRUE(Dmod_FileAvailable(source)); /* RTC still exists. */
+    DMOD_TEST_EXPECT_EQ(dmutc_get(&now),-ENODEV);
+    DMOD_TEST_EXPECT_EQ(libsystemd_start_service(unit.name,NULL),0);
+    DMOD_TEST_EXPECT_EQ(dmutc_get(&now),0);
+    /* Replace the device event payload while keeping its identity: a stale
+     * cached %v must not silently bind the old, still-existing RTC path. */
+    const char* name=unit.name+6;
+    DMOD_TEST_EXPECT_EQ(libsystemd_notify_device_removed("rtc",name),0);
+    DMOD_TEST_EXPECT_EQ(libsystemd_notify_device_added("rtc",name,"/no-such-utc-source"),-ENODEV);
+    DMOD_TEST_EXPECT_EQ(dmutc_get(&now),-ENODEV);
+    DMOD_TEST_EXPECT_EQ(libsystemd_notify_device_added("rtc",name,source),0);
+    DMOD_TEST_EXPECT_EQ(dmutc_get(&now),0);
+}
 DMOD_TEST_STEP(vfs_rtc_utc_round_trip_and_restore)
 {
     dmutc_time_t saved, now; dmutc_status_t status;
-    int rc=dmutc_get(NULL,&saved);
+    int rc=dmutc_get(&saved);
     DMOD_TEST_EXPECT_EQ(rc,0); if(rc!=0)return;
     uint64_t started=Dmod_GetUptime();
-    DMOD_TEST_EXPECT_EQ(dmutc_status(NULL,&status),0);
+    DMOD_TEST_EXPECT_EQ(dmutc_status(&status),0);
     DMOD_TEST_EXPECT_TRUE(status.flags & DMUTC_CLOCK_RUNNING);
     DMOD_TEST_EXPECT_TRUE(status.flags & DMUTC_CLOCK_WRITABLE);
     const dmutc_time_t seed={951827696,0,0};
-    DMOD_TEST_EXPECT_EQ(dmutc_set(NULL,&seed),0);
-    DMOD_TEST_EXPECT_EQ(dmutc_get(NULL,&now),0);
+    DMOD_TEST_EXPECT_EQ(dmutc_set(&seed),0);
+    DMOD_TEST_EXPECT_EQ(dmutc_get(&now),0);
     DMOD_TEST_EXPECT_TRUE(now.seconds>=seed.seconds && now.seconds<=seed.seconds+1);
     dmutc_time_t fraction=seed; fraction.nanosecond=1;
-    DMOD_TEST_EXPECT_EQ(dmutc_set(NULL,&fraction),-ERANGE);
+    DMOD_TEST_EXPECT_EQ(dmutc_set(&fraction),-ERANGE);
     saved.seconds+=(int64_t)((Dmod_GetUptime()-started)/1000);
-    DMOD_TEST_EXPECT_EQ(dmutc_set(NULL,&saved),0);
-    DMOD_TEST_EXPECT_EQ(dmutc_get(NULL,&now),0);
+    DMOD_TEST_EXPECT_EQ(dmutc_set(&saved),0);
+    DMOD_TEST_EXPECT_EQ(dmutc_get(&now),0);
     DMOD_TEST_EXPECT_TRUE(now.seconds>=saved.seconds && now.seconds<=saved.seconds+1);
     Dmod_Printf("UTC_SAMPLE seconds=%lld nanosecond=%u resolution_ns=%llu\n",
         (long long)now.seconds,(unsigned)now.nanosecond,(unsigned long long)status.resolution_ns);

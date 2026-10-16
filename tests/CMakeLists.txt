@@ -33,6 +33,7 @@ else()
 endif()
 
 if(DMOD_ARCH MATCHES "armv7")
+    dmod_link_modules(${DMOD_MODULE_NAME} libsystemd dmosi)
     target_compile_definitions(${DMOD_MODULE_NAME} PRIVATE DMUTC_BOARD_TEST)
 endif()
 
@@ -41,14 +42,17 @@ if(DMOD_ARCH STREQUAL "x86_64" OR NOT DEFINED DMOD_ARCH)
     find_program(HOST_CC NAMES cc gcc REQUIRED)
     set(PROVIDER_TEST ${CMAKE_CURRENT_SOURCE_DIR}/rtc)
     add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test_rtc_provider
-        COMMAND ${HOST_CC} -std=c11 -Wall -Wextra -Werror
+        COMMAND ${HOST_CC} -std=c11 -Wall -Wextra -Werror -pthread
             -I${PROVIDER_TEST}/stubs -I${CMAKE_CURRENT_SOURCE_DIR}/../include
+            -I${CMAKE_CURRENT_SOURCE_DIR}/../src
             -I${DMOD_DMF_DIR}/inc/dmdrvi/include
             ${PROVIDER_TEST}/rtc_test.c ${CMAKE_CURRENT_SOURCE_DIR}/../src/dmutc.c
-            ${CMAKE_CURRENT_SOURCE_DIR}/../src/rtc.c
+            ${CMAKE_CURRENT_SOURCE_DIR}/../src/rtc.c ${CMAKE_CURRENT_SOURCE_DIR}/../src/service.c
             -o ${CMAKE_CURRENT_BINARY_DIR}/test_rtc_provider
         DEPENDS ${PROVIDER_TEST}/rtc_test.c ${PROVIDER_TEST}/stubs/dmod.h
-            ${PROVIDER_TEST}/stubs/dmutc_defs.h ${CMAKE_CURRENT_SOURCE_DIR}/../include/dmutc.h
+            ${PROVIDER_TEST}/stubs/dmutc_defs.h ${PROVIDER_TEST}/stubs/dmosi.h
+            ${PROVIDER_TEST}/stubs/libsystemd_service.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/../src/service.c ${CMAKE_CURRENT_SOURCE_DIR}/../src/service.h ${CMAKE_CURRENT_SOURCE_DIR}/../include/dmutc.h
             ${CMAKE_CURRENT_SOURCE_DIR}/../src/dmutc.c ${CMAKE_CURRENT_SOURCE_DIR}/../src/rtc.c
             ${DMOD_DMF_DIR}/inc/dmdrvi/include/dmdrvi_ioctl.h)
     add_custom_target(rtc_provider_test_build ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/test_rtc_provider)
