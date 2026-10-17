@@ -58,6 +58,27 @@ dmod_dmutc_api(1.0, int, _status, (dmutc_status_t* status));
 /* Copy the selected source path for diagnostics; -ENOSPC if too small.
  * Includes the NUL terminator; buffer is cleared on failure. */
 dmod_dmutc_api(1.0, int, _source, (char* buffer, size_t capacity));
+
+/* External UTC sources: modules that can tell the time, e.g. dmntp (NTP).
+ * A source implements this DIF: the time now and error_ns, how far it may be
+ * from UTC (for NTP: the root distance of the exchange). 0, else a negative
+ * errno (e.g. -ENODATA, -ETIMEDOUT: no time now). It may block - it is asked
+ * by dmutc_read_sources() / dmutc_sync(), never by dmutc_get(). */
+dmod_dmutc_dif(1.0, int, _read_source, (dmutc_time_t* time, uint64_t* error_ns));
+
+/* Ask every loaded module implementing the DIF above and return the time of
+ * the one with the smallest error. -ENODATA: none answered (none loaded, or
+ * each failed); outputs are cleared on failure. */
+dmod_dmutc_api(1.0, int, _read_sources, (dmutc_time_t* time, uint64_t* error_ns));
+
+/* Set the RTC from dmutc_read_sources(). 0; -ENODATA: no source answered;
+ * -ENODEV: no RTC; else the RTC's error. dmutc does it by itself: right
+ * after it is loaded and whenever an RTC is bound (again every
+ * DMUTC_SYNC_RETRY_MS until it succeeds), then every DMUTC_SYNC_PERIOD_MS -
+ * in between the RTC keeps the time. */
+dmod_dmutc_api(1.0, int, _sync, (void));
+#define DMUTC_SYNC_RETRY_MS     (60u * 1000u)
+#define DMUTC_SYNC_PERIOD_MS    (24u * 60u * 60u * 1000u)
 #ifdef __cplusplus
 }
 #endif

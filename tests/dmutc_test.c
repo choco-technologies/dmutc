@@ -157,3 +157,29 @@ DMOD_TEST_STEP(vfs_rtc_utc_round_trip_and_restore)
         (long long)now.seconds,(unsigned)now.nanosecond,(unsigned long long)status.resolution_ns);
 }
 #endif
+
+/* External UTC sources: test_dmutc_source (tests/source) */
+DMOD_TEST_STEP(external_sources_are_asked_for_the_time)
+{
+    dmutc_time_t time;
+    uint64_t error_ns;
+
+    DMOD_TEST_EXPECT_NOT_NULL(Dmod_LoadModuleByName("test_dmutc_source"));
+    DMOD_TEST_EXPECT_TRUE(Dmod_EnableModule("test_dmutc_source", false, NULL));
+    DMOD_TEST_EXPECT_EQ(dmutc_read_sources(&time, &error_ns), 0);
+    DMOD_TEST_EXPECT_EQ(time.seconds, 1792224000);
+    DMOD_TEST_EXPECT_EQ(time.nanosecond, 250000000u);
+    DMOD_TEST_EXPECT_EQ(error_ns, 1u);
+    DMOD_TEST_EXPECT_EQ(dmutc_read_sources(NULL, &error_ns), -EINVAL);
+#ifndef DMUTC_BOARD_TEST
+    DMOD_TEST_EXPECT_EQ(dmutc_sync(), -ENODEV);     /* (a source, no RTC on the host) */
+#endif
+
+    DMOD_TEST_EXPECT_TRUE(Dmod_DisableModule("test_dmutc_source", false));
+#ifndef DMUTC_BOARD_TEST
+    DMOD_TEST_EXPECT_EQ(dmutc_read_sources(&time, &error_ns), -ENODATA);
+    DMOD_TEST_EXPECT_EQ(time.seconds, 0);
+    DMOD_TEST_EXPECT_EQ(dmutc_sync(), -ENODATA);
+#endif
+    (void)Dmod_UnloadModule("test_dmutc_source", false);
+}

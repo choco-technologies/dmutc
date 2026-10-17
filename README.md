@@ -51,7 +51,25 @@ work independently of whether any RTC service is active.
 
 The library keeps a mutex-protected source registry. RTC operations own their
 VFS handles and finish before a concurrent STOP can release the chosen path.
-There is no background thread, timer or polling loop.
+
+## External UTC sources
+
+A module that can tell the time - dmntp (NTP) - implements the
+`dmutc_read_source` DIF: the time now and how far it may be from UTC.
+`dmutc_read_sources()` asks every loaded module implementing it and takes the
+one with the smallest error; `dmutc_sync()` sets the RTC from it. dmutc does
+that by itself, in a thread of its own: after it is loaded and whenever an
+RTC is bound, again every minute until it succeeds (e.g. while the network
+is not up yet), then every 24 hours. In between the RTC keeps the time -
+`dmutc_get()` never waits for a source.
+
+```c
+dmod_dmutc_dif_api_declaration(1.0, my_module, int, _read_source,
+    (dmutc_time_t* time, uint64_t* error_ns))
+{
+    /* the time now, *error_ns: how far it may be off; 0 or a negative errno */
+}
+```
 
 Install the packaged configs with the standard service/rules tags:
 

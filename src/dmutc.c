@@ -94,6 +94,13 @@ dmod_libsystemd_dif_api_declaration(1.0, dmutc, int, _service_stop, (const char*
 int dmod_init(const Dmod_Config_t* config)
 {
     (void)config;
-    return dmutc_sources_init();
+    int rc = dmutc_sources_init();
+    if (rc == 0)
+        rc = dmutc_sync_start();
+    return rc;
 }
-int dmod_deinit(void) { return dmutc_sources_deinit(); }
+int dmod_deinit(void)
+{
+    dmutc_sync_stop();
+    return dmutc_sources_deinit();
+}

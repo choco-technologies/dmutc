@@ -25,6 +25,10 @@ static unsigned opens, closes, writes, reads;
 static bool open_error, write_handle;
 static int failing_command, command_error;
 static char last_path[64];
+/* sync.c (the external sources' thread) is not under this test */
+int dmutc_sync_start(void) { return 0; }
+void dmutc_sync_stop(void) {}
+void dmutc_sync_now(void) {}
 static void reset(void)
 {
     dmutc_stop_source("dmutc@model");

@@ -44,6 +44,24 @@ on the source mutex for active I/O, removes only its binding, and leaves shared
 library code available to API consumers. No source is reconstructed from a
 fixed path after STOP. Module deinitialization releases the registry and mutex.
 
-Calls use VFS/mutexes and belong in thread context. There is no periodic worker,
-network synchronization or implicit authentication of time. A TLS application
+Calls use VFS/mutexes and belong in thread context. There is no implicit
+authentication of time.
+
+## External sources
+
+| Function | |
+| --- | --- |
+| `dmutc_read_sources(&time, &error_ns)` | The time of the loaded module implementing `dmutc_read_source` with the smallest `error_ns`; `-ENODATA`: none answered |
+| `dmutc_sync()` | `dmutc_set()` of that; `-ENODATA`, `-ENODEV` (no RTC) or the RTC's error |
+
+`dmutc_read_source` (DIF, `dmod_dmutc_dif`): `int (dmutc_time_t* time,
+uint64_t* error_ns)` - the time now and how far it may be from UTC; 0 or a
+negative errno. It may block (network): it is called from dmutc's sync thread,
+never from `dmutc_get()`. A reading with a nanosecond out of range or a
+non-zero reserved field is ignored.
+
+The sync thread (started by `dmod_init`, joined by `dmod_deinit`) calls
+`dmutc_sync()` right away and whenever an RTC is bound, then after
+`DMUTC_SYNC_RETRY_MS` (1 min) while it fails and `DMUTC_SYNC_PERIOD_MS` (24 h)
+once it succeeded. A TLS application
 must establish which time sources it accepts through its system/trust policy.
