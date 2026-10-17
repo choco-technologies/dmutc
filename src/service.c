@@ -63,6 +63,7 @@ int dmutc_start_source(const char* unit, int argc, const char* const argv[])
     }
     dmosi_mutex_unlock(lock);
     if (rc != 0) free_source(candidate);
+    else dmutc_sync_now(); /* A new RTC: set it from the external sources. */
     return rc;
 }
 int dmutc_stop_source(const char* unit)

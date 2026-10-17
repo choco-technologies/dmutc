@@ -64,6 +64,7 @@ dmod_add_library(${DMOD_MODULE_NAME} ${DMOD_MODULE_VERSION}
     src/dmutc.c
     src/rtc.c
     src/service.c
+    src/sync.c
 )
 
 target_include_directories(${DMOD_MODULE_NAME} PRIVATE

@@ -58,3 +58,5 @@ if(DMOD_ARCH STREQUAL "x86_64" OR NOT DEFINED DMOD_ARCH)
     add_custom_target(rtc_provider_test_build ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/test_rtc_provider)
     add_test(NAME rtc_provider COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_rtc_provider)
 endif()
+
+add_subdirectory(source)
