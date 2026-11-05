@@ -1,3 +1,22 @@
+# External-source synchronization and RTC precision — 2026-11-05
+
+- Native ctest: 3/3 targets pass, including the existing conversion and RTC
+  provider checks and eight new synchronous-source scenarios.
+- The new sync regression fails against the original `src/sync.c`: a strict
+  whole-second RTC rejects the external source's fractional sample with ERANGE.
+- Sync coverage includes whole-second, millisecond and nanosecond RTCs, an
+  already aligned fraction, a pre-epoch timestamp and source/status/write errors.
+- Cortex-M4 and Cortex-M7 builds pass. No M4 execution is claimed.
+- STM32F746G-DISCO, after restoring Internet connectivity: direct NTP and the
+  default server list both return valid fractional UTC. The installed
+  `dmutc_sync()` returns -34 (ERANGE); RTC remains unset and CarHMI shows --:--.
+- The patched production `src/sync.c` was compiled into a temporary RAM probe,
+  using the board's loaded source-selection and RTC APIs. It returns 0, changes
+  `calendar_set` from 0 to 1, and allows a valid UTC calendar to be read back.
+  CarHMI's live `clock` property then reads `17:29` for RTC UTC `16:29` (CET).
+  The probe was removed after verification. No firmware or persistent module
+  replacement was performed; that requires deploying a build containing this fix.
+
 # Service-driven RTC binding — 2026-10-16
 
 The current implementation receives its source through dmdevfs RTC events,

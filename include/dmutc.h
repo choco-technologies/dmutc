@@ -71,7 +71,9 @@ dmod_dmutc_dif(1.0, int, _read_source, (dmutc_time_t* time, uint64_t* error_ns))
  * each failed); outputs are cleared on failure. */
 dmod_dmutc_api(1.0, int, _read_sources, (dmutc_time_t* time, uint64_t* error_ns));
 
-/* Set the RTC from dmutc_read_sources(). 0; -ENODATA: no source answered;
+/* Set the RTC from dmutc_read_sources(), truncating the subsecond fraction
+ * to the RTC resolution. Explicit dmutc_set() retains its strict precision
+ * contract. 0; -ENODATA: no source answered;
  * -ENODEV: no RTC; else the RTC's error. dmutc does it by itself: right
  * after it is loaded and whenever an RTC is bound (again every
  * DMUTC_SYNC_RETRY_MS until it succeeds), then every DMUTC_SYNC_PERIOD_MS -

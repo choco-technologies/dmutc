@@ -60,3 +60,22 @@ if(DMOD_ARCH STREQUAL "x86_64" OR NOT DEFINED DMOD_ARCH)
 endif()
 
 add_subdirectory(source)
+
+# Exercise the production source-selection and sync path with a strict RTC.
+if(DMOD_ARCH STREQUAL "x86_64" OR NOT DEFINED DMOD_ARCH)
+    set(SYNC_TEST ${CMAKE_CURRENT_SOURCE_DIR}/sync)
+    add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/test_sync
+        COMMAND ${HOST_CC} -std=c11 -Wall -Wextra -Werror
+            -I${SYNC_TEST}/stubs -I${PROVIDER_TEST}/stubs
+            -I${CMAKE_CURRENT_SOURCE_DIR}/../include
+            -I${CMAKE_CURRENT_SOURCE_DIR}/../src
+            ${SYNC_TEST}/sync_test.c ${CMAKE_CURRENT_SOURCE_DIR}/../src/sync.c
+            -o ${CMAKE_CURRENT_BINARY_DIR}/test_sync
+        DEPENDS ${SYNC_TEST}/sync_test.c ${SYNC_TEST}/stubs/dmod.h
+            ${SYNC_TEST}/stubs/dmosi.h ${PROVIDER_TEST}/stubs/dmutc_defs.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/../include/dmutc.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/../src/service.h
+            ${CMAKE_CURRENT_SOURCE_DIR}/../src/sync.c)
+    add_custom_target(sync_test_build ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/test_sync)
+    add_test(NAME sync COMMAND ${CMAKE_CURRENT_BINARY_DIR}/test_sync)
+endif()
