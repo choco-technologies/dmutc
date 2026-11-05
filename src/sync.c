@@ -76,8 +76,17 @@ dmod_dmutc_api_declaration(1.0, int, _sync, (void))
     uint64_t error_ns;
 
     int rc = dmutc_read_sources(&time, &error_ns);
+    dmutc_status_t status;
     if (rc == 0)
+        rc = dmutc_status(&status);
+    if (rc == 0)
+    {
+        /* External sources can be finer than the RTC (e.g. NTP versus a
+         * whole-second calendar). Discard the fraction it cannot store;
+         * explicit dmutc_set() calls still preserve precision or fail. */
+        time.nanosecond -= time.nanosecond % status.resolution_ns;
         rc = dmutc_set(&time);
+    }
     if (rc == 0)
     {
         DMOD_LOG_INFO("dmutc: RTC set from an external source (+/- %lu ms)\n",

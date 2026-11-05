@@ -52,7 +52,7 @@ authentication of time.
 | Function | |
 | --- | --- |
 | `dmutc_read_sources(&time, &error_ns)` | The time of the loaded module implementing `dmutc_read_source` with the smallest `error_ns`; `-ENODATA`: none answered |
-| `dmutc_sync()` | `dmutc_set()` of that; `-ENODATA`, `-ENODEV` (no RTC) or the RTC's error |
+| `dmutc_sync()` | Truncate the source's subsecond fraction to the RTC resolution, then `dmutc_set()`; `-ENODATA`, `-ENODEV` (no RTC) or the RTC's error |
 
 `dmutc_read_source` (DIF, `dmod_dmutc_dif`): `int (dmutc_time_t* time,
 uint64_t* error_ns)` - the time now and how far it may be from UTC; 0 or a
